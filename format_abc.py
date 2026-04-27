@@ -181,7 +181,7 @@ def format_abc(lines, split_option, recode_option):
 	if recode_option is None:
 		recode_option = False
 		for line in lines:
-			if line[:4].lower() == "w:a1":
+			if "w:a1 w:la".find(line[:4].lower()) >= 0:
 				recode_option = True
 				break
 	lines.append(" :")
@@ -281,19 +281,14 @@ def format_abc(lines, split_option, recode_option):
 					new_words[-1] += token
 				elif token != "" and token != " ":
 					new_words.append(token)
-			if len(words) > 0:
-				words[-1] = new_words
-			else:
-				words.append(new_words)
+			words.append(new_words)
 		if line[1] != ":":
 			if voice == None:
 				voice = 0
 			eol = len(line.strip())
-			if line[-2] == "\\":
+			if line[-1] == "\\":
 				eol -= 1
 			music += line[:eol]
-			if len(words) > 0:
-				words.append([])
 	return new_lines
 
 if __name__ == "__main__":
