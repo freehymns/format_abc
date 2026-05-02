@@ -29,6 +29,8 @@ DEFAULT_LENGTH = 'mcm_default'
 
 repl_by_spaces = lambda m: ' ' * len(m.group(0))
 
+bar_sep_symbols = ':|][|: :|[2 :|]2 :||: [|] :|] [|: :|| ||: :|: |:: ::| |[1 :|2 |] || [| :: .| |1 |: :| [1 [2 |'.split()
+
 note_pattern = r"(?P<note>([_=^]?[A-Ga-gxz](,+|'+)?))(?P<length>\d{0,3}(?:/\d{0,3})*)(?P<dot>\.*)(?P<broken>[><]?)"
 tuplet_pattern = r"\((?P<p>[1-9])(?:\:(?P<q>[1-9]?))?(?:\:(?P<r>[1-9]?))?" # put p notes into the time of q for the next r notes
 
@@ -49,6 +51,18 @@ def get_metre(abc):
     else:
         return Fraction(4, 4)
 
+def simplify_bars(abc):
+    # replace bar symbols with spaces and one simple bar line
+	for sym in bar_sep_symbols:
+		clean_sym = ""
+		found_bar = False
+		for i in range(len(sym)):
+			clean_sym += ("|" if sym[i] == "|" and (not found_bar) else " ")
+			if sym[i] == "|":
+				found_bar = True
+		abc = abc.replace(sym, clean_sym)
+	return abc
+
 def remove_non_note_fragments(abc):
     # replace non-note fragments of the text by replacing them by spaces (thereby preserving offsets), but keep also bar and repeat symbols
     abc = re.sub(r'(?m)%.*$', repl_by_spaces, abc)     # remove comments
@@ -61,20 +75,28 @@ def remove_non_note_fragments(abc):
     return abc
 
 def replace_chords_by_first_note(abc):
-    # replace "[AD]2 [B2C2e2]" by "A2 B2" - the first note in each chord
-    abc = remove_non_note_fragments(abc)
+    # replace "[AD]2 [B2C2e2]" by "   A2       B2" - the first note in each chord, preserving offsets
+    #abc = remove_non_note_fragments(abc)
     note_pattern = r"(?P<note>([_=^]?[A-Ga-gxz](,+|'+)?))(?P<length>\d{0,2}/\d{1,2}|/+|\d{0,2})(?P<broken>[><]?)"
     def sub_func(m):
-        match = re.search(note_pattern, m.group(0))
-        if match:
-            return match.group(0)
+        match1 = re.search(note_pattern, m.group(0))
+        if match1:
+            match_many = re.search('(' + note_pattern + '\-?)+', m.group(0))
+            return ' ' * (len(match_many.group(0)) - len(match1.group(0)) + 2) + match1.group(0)
         else:
-            return ' ' * len(match.group(0))
+            return ' ' * len(match1.group(0))
     return re.sub(r'\[.*?\]', sub_func, abc)
-
-def get_bar_length(abc, default_length, metre):
+	
+def strip_abc(abc):
+    abc = simplify_bars(abc)
     abc = remove_non_note_fragments(abc)
     abc = replace_chords_by_first_note(abc)
+    return abc
+
+def get_bar_length(abc, default_length, metre):
+    #abc = remove_non_note_fragments(abc)
+    #abc = replace_chords_by_first_note(abc)
+    abc = strip_abc(abc)
 
     total_length = Fraction(0)
     last_broken_rythm = ''
@@ -147,6 +169,30 @@ def get_bar_length(abc, default_length, metre):
 # End of EasyABC code
 #
 
+"""def find_phrase_end(music, stripped_music, note_end):
+	end = note_end
+	if end < len(music) and stripped_music[end] == " ":
+		while end < len(music) and music[end] != " " and music[end] != "|":
+			end += 1
+		while end < len(music) and music[end] == " ":
+			end += 1
+	while end < len(music) and ")]}".find(music[end]) >= 0:
+		end += 1
+	while end < len(music) and music[end] == " ":
+		end += 1
+	while end < len(music) and ")]}".find(music[end]) >= 0:
+		end += 1
+	while end < len(music) and music[end] == " ":
+		end += 1
+	return end"""
+
+def find_phrase_end(music, stripped_music, note_end):
+	end = note_end
+	length = len(music)
+	while end < length and " y|)]}-".find(stripped_music[end]) >= 0 and (music[end] != "[" or (end > length + 2 and music[end+2] == ":")):
+		end += 1
+	return end
+
 def new_words_line(lineno, words, line_note_count, voice, split_option, recode_option):
 	line = ("w:" if lineno == 0 or split_option else "+:")
 	if recode_option:
@@ -159,7 +205,7 @@ def new_words_line(lineno, words, line_note_count, voice, split_option, recode_o
 				if n > 1:
 					line += " "
 				line += chr(letter + lineno) + str(n)
-			n += 1
+				n += 1
 	else:
 		line += " ".join(words).replace(" _", "_")
 	return line
@@ -169,7 +215,7 @@ def format_abc(lines, split_option, recode_option):
 		split_option = False
 		music_lineno = 0
 		for line in lines:
-			if line[0] == "%" or len(line) < 2:
+			if len(line) < 2 or line[0] == "%":
 				continue
 			if line[:2] == "V:":
 				music_lineno = 0
@@ -181,10 +227,10 @@ def format_abc(lines, split_option, recode_option):
 	if recode_option is None:
 		recode_option = False
 		for line in lines:
-			if "w:a1 w:la".find(line[:4].lower()) >= 0:
+			if line[:4].lower() == "w:a1":
 				recode_option = True
 				break
-	lines.append(" :")
+	lines.append("^:")
 	meter = get_metre("")
 	default_len = get_default_len("")
 	new_lines = []
@@ -193,15 +239,15 @@ def format_abc(lines, split_option, recode_option):
 	music = ""
 	line_lengths = []
 	for line in lines:
-		if line[0] == "%" or len(line) < 2:
-			new_lines.append(line.strip())
-			continue
-		if (line[1] == ":" and (voice == None or (line[0] != "w" and line[0] != "+"))):
+		if len(line) < 2 or line[0] == "%" or (line[1] == ":" and line[0] != "|" and (voice == None or (line[0] != "w" and line[0] != "+"))):
+			#print(words)
 			if len(music) > 0:
 				if not split_option:
 					new_lines.append(music)
-				stripped_music = remove_non_note_fragments(music)
-				stripped_music = replace_chords_by_first_note(stripped_music)
+				stripped_music = strip_abc(music)
+				#print(str(len(music)) + " " + str(len(stripped_music)))
+				#print(music)
+				#print(stripped_music)
 				notes_iter = re.finditer(r'(%s)|(%s)' % (note_pattern, tuplet_pattern), stripped_music)
 				start = 0
 				end = 0
@@ -211,26 +257,25 @@ def format_abc(lines, split_option, recode_option):
 						while True:
 							try:
 								note = next(notes_iter)
+								#print(note, end="")
+								#print(" " + words[lineno][note_count])
 								note_count += 1
 								if note_count == len(words[lineno]):
 									if lineno == len(words) - 1:
 										end = len(music)
 									else:
-										end = note.end()
+										end = find_phrase_end(music, stripped_music, note.end())
 									break;
 							except:
 								end = len(music)
 								break
-						if end < len(music) and stripped_music[end] == " ":
-							while end < len(music) and music[end] != " " and music[end] != "|":
-								end += 1
-							while end < len(music) and music[end] == " ":
-								end += 1
 						if (split_option and end > start):
 							new_lines.append(music[start:end] + ("\\" if (lineno+1) < len(words) else ""))
 						new_lines.append(new_words_line(lineno, words[lineno], note_count, voice, split_option, recode_option))
+						#print (new_lines[-1])
 						line_lengths.append(get_bar_length(music[start:end], default_len, meter))
 						start = end
+					#print(line_lengths)
 				else:
 					lineno = 0
 					line_len = 0
@@ -243,30 +288,32 @@ def format_abc(lines, split_option, recode_option):
 						except:
 							next_note = None
 						line_len += get_bar_length(note.group(0), default_len, meter)
-						line_note_count += 1
-						if line_len == line_lengths[lineno] or next_note is None:
+						if "zx".find(note.group(0).strip()[0]) < 0:
+							line_note_count += 1
+						#print(note, end="")
+						#print(" " + str(line_len) + " " + str(line_note_count))
+						if line_len >= line_lengths[lineno] or next_note is None:
 							if next_note is None:
 								end = len(music)
 							else:
-								end = note.end()
-								if end < len(music) and stripped_music[end] == " ":
-									while end < len(music) and music[end] != " " and music[end] != "|":
-										end += 1
-									while end < len(music) and music[end] == " ":
-										end += 1
+								end = find_phrase_end(music, stripped_music, note.end())
 							if split_option:
 								new_lines.append(music[start:end] + ("\\" if (lineno+1) < len(line_lengths) else ""))
+								#print (new_lines[-1])
 							if len(words) > 0:
-								new_lines.append(new_words_line(lineno, words[lineno], line_note_count, voice, split_option, recode_option))
+								line_words = ([] if lineno >= len(words) else words[lineno])
+								new_lines.append(new_words_line(lineno, line_words, line_note_count, voice, split_option, recode_option))
 							start = end
-							line_len = 0
+							line_len -= line_lengths[lineno]
 							line_note_count = 0
 							lineno += 1
 						note = next_note
 				words = []
 				music = ""
-			if line[0] != " ":
+			if line != "^:":
 				new_lines.append(line.strip())
+		if len(line) < 2 or line[0] == "%" or line == "^:":
+			continue
 		if line[:2] == "M:":
 			meter = get_metre(line)
 		if line[:2] == "L:":
@@ -281,14 +328,19 @@ def format_abc(lines, split_option, recode_option):
 					new_words[-1] += token
 				elif token != "" and token != " ":
 					new_words.append(token)
+			#if len(words) > 0:
+			#	words[-1] = new_words
+			#else:
 			words.append(new_words)
-		if line[1] != ":":
+		if line[1] != ":" or line[0] == "|":
 			if voice == None:
 				voice = 0
 			eol = len(line.strip())
 			if line[-1] == "\\":
 				eol -= 1
 			music += line[:eol]
+			#if len(words) > 0:
+			#	words.append([])
 	return new_lines
 
 if __name__ == "__main__":
