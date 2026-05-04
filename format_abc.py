@@ -2,7 +2,7 @@ import re
 from fractions import Fraction
 import sys
 
-ENCODING = "iso-8859-1"
+ENCODING = "utf-8"
 
 #
 # This code is derived from the abc_search and aligner modules
@@ -305,6 +305,7 @@ def format_abc(lines, split_option, recode_option):
 			default_len = get_default_len(line)
 		if line[:2] == "V:":
 			voice = (0 if voice == None else voice+1)
+			#print("Voice " + str(voice))
 		if line[:2] == "w:" or (voice != None and line[:2] == "+:"):
 			new_words = []
 			tokens = re.split(r'( |_|-)', line[2:].strip())
