@@ -222,6 +222,7 @@ def format_abc(lines, split_option, recode_option):
 	music = ""
 	line_lengths = []
 	for line in lines:
+		#print(line)
 		if len(line) < 2 or line[0] == "%" or (line[1] == ":" and line[0] != "|" and (voice == None or (line[0] != "w" and line[0] != "+"))):
 			#print(words)
 			if len(music) > 0:
@@ -242,7 +243,7 @@ def format_abc(lines, split_option, recode_option):
 								note = next(notes_iter)
 								#print(note, end="")
 								#print(" " + words[lineno][note_count])
-								if "zx".find(note.group(0)[0]) < 0:
+								if "zx".find(note.group(0).strip()[0]) < 0:
 									note_count += 1
 								if note_count == len(words[lineno]):
 									if lineno == len(words) - 1:
@@ -319,10 +320,11 @@ def format_abc(lines, split_option, recode_option):
 		if line[1] != ":" or line[0] == "|":
 			if voice == None:
 				voice = 0
-			eol = len(line.strip())
+			stripped_line = line.strip()
+			eol = len(stripped_line)
 			if line[-1] == "\\":
 				eol -= 1
-			music += line[:eol]
+			music += stripped_line[:eol]
 			#if len(words) > 0:
 			#	words.append([])
 	return new_lines
