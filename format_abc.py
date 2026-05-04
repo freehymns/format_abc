@@ -169,23 +169,6 @@ def get_bar_length(abc, default_length, metre):
 # End of EasyABC code
 #
 
-"""def find_phrase_end(music, stripped_music, note_end):
-	end = note_end
-	if end < len(music) and stripped_music[end] == " ":
-		while end < len(music) and music[end] != " " and music[end] != "|":
-			end += 1
-		while end < len(music) and music[end] == " ":
-			end += 1
-	while end < len(music) and ")]}".find(music[end]) >= 0:
-		end += 1
-	while end < len(music) and music[end] == " ":
-		end += 1
-	while end < len(music) and ")]}".find(music[end]) >= 0:
-		end += 1
-	while end < len(music) and music[end] == " ":
-		end += 1
-	return end"""
-
 def find_phrase_end(music, stripped_music, note_end):
 	end = note_end
 	length = len(music)
@@ -197,7 +180,7 @@ def new_words_line(lineno, words, line_note_count, voice, split_option, recode_o
 	line = ("w:" if lineno == 0 or split_option else "+:")
 	if recode_option:
 		letter = ord("A") if voice == 0 else ord("a")
-		n = 1;
+		n = 1
 		for i in range(line_note_count):
 			if i < len(words) and words[i] == "_":
 				line += "_"
@@ -259,7 +242,8 @@ def format_abc(lines, split_option, recode_option):
 								note = next(notes_iter)
 								#print(note, end="")
 								#print(" " + words[lineno][note_count])
-								note_count += 1
+								if "zx".find(note.group(0)[0]) < 0:
+									note_count += 1
 								if note_count == len(words[lineno]):
 									if lineno == len(words) - 1:
 										end = len(music)
